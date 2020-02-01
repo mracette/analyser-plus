@@ -1,3 +1,5 @@
+import * as d3 from 'd3-ease';
+
 export class Analyser {
 
     constructor(context, input, params) {
@@ -39,6 +41,25 @@ export class Analyser {
         // update the min / max according to the actual calculated above
         this.minFrequency = (this.binMin + this.adj) * this.binSize;
         this.maxFrequency = (this.binMax + this.adj) * this.binSize;
+
+        // convert any string easing params into functions
+        if (typeof this.xEasing === 'string') {
+            switch (this.xEasing) {
+                case 'polyIn': this.xEasing = d3.easePolyIn.exponent(this.xExponent); break;
+                case 'polyOut': this.xEasing = d3.easePolyOut.exponent(this.xExponent); break;
+                case 'polyInOut': this.xEasing = d3.easePolyInOut.exponent(this.xExponent); break;
+                default: this.xEasing = (n) => n; break;
+            }
+        }
+
+        if (typeof this.yEasing === 'string') {
+            switch (this.yEasing) {
+                case 'polyIn': this.yEasing = d3.easePolyIn.exponent(this.yExponent); break;
+                case 'polyOut': this.yEasing = d3.easePolyOut.exponent(this.yExponent); break;
+                case 'polyInOut': this.yEasing = d3.easePolyInOut.exponent(this.yExponent); break;
+                default: this.yEasing = (n) => n; break;
+            }
+        }
 
         this.createAudioNodes();
         this.createDataStructure();

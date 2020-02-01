@@ -3,10 +3,10 @@ import * as d3 from 'd3-ease';
 import * as dat from 'dat.gui';
 import { Analyser } from './analyser';
 import { cContext, drawFreqLines, drawFreqBuckets, drawXAxis, drawAnalyserBounds, drawEasing, clear } from './drawing';
+import { morningsAudioFiles } from './configs/audioFiles';
 
-const AUDIO_PATH = '../audio/rhythm.mp3';
+const AUDIO_PATH = 'audio/mornings/';
 const GUI = new dat.GUI();
-
 const startButton = document.getElementById('start-button');
 const aContext = new AudioContext();
 
@@ -14,6 +14,10 @@ let audioState = 'stopped';
 let buffer;
 let player;
 let analysers = {};
+
+const audioParams = {
+    file: "melody-two[8].mp3"
+}
 
 const globalParams = {
     power: 6,
@@ -29,27 +33,17 @@ const stagingParams = {
     compareMode: false,
     xEasingFunction: 'none',
     yEasingFunction: 'none',
-    smoothingTimeConstant: .8
+    smoothingTimeConstant: .8,
+    xExponent: 3,
+    yExponent: 3,
 }
 
-const easingParams = {
-    'xEasingExponent': 1.5,
-    'yEasingExponent': 1.5
-}
-
-const easings = {
-    'none': (n) => n,
-    'polyIn': d3.easePolyIn,
-    'polyOut': d3.easePolyOut,
-    'polyInOut': d3.easePolyInOut,
-    'expIn': d3.easeExpIn,
-    'expOut': d3.easeExpOut,
-    'expInOut': d3.easeExpInOut
-};
+const easings = ['none', 'polyIn', 'polyOut', 'polyInOut'];
 
 const init = () => {
     return new Promise((resolve, reject) => {
-        crco.createAudioPlayer(aContext, AUDIO_PATH).then((p) => {
+        crco.createAudioPlayer(aContext, AUDIO_PATH + audioParams.file).then((p) => {
+            console.log('p', p);
             startButton.disabled = false;
             buffer = p.buffer
             player = p;
@@ -64,16 +58,35 @@ const init = () => {
                 id: 'staging',
                 ...globalParams,
                 ...stagingParams,
-                xEasing: easings[stagingParams.xEasingFunction],
-                yEasing: easings[stagingParams.yEasingFunction],
+                xEasing: getEasingFunction(stagingParams.xEasingFunction, { exponent: stagingParams.xExponent }),
+                yEasing: getEasingFunction(stagingParams.yEasingFunction, { exponent: stagingParams.yExponent }),
             });
-            initGui();
             resolve();
         }).catch(err => reject(err));
     });
 }
 
+const resetAudio = () => {
+
+    console.log(player);
+
+    player.stop();
+
+    init().then(() => {
+        aContext.resume();
+        analysers.standard.reconnect(player);
+        analysers.staging.reconnect(player);
+        player.connect(aContext.destination);
+        player.start();
+    });
+
+
+}
+
 const initGui = () => {
+
+    const audio = GUI.addFolder('audio');
+    audio.add(audioParams, 'file').options(morningsAudioFiles.sort()).onChange(resetAudio);
 
     const globals = GUI.addFolder('globals');
     globals.add(globalParams, 'power', 5, 15, 1);
@@ -87,47 +100,69 @@ const initGui = () => {
 
     const staging = GUI.addFolder('staging');
     staging.add(stagingParams, 'compareMode');
-    staging.add(stagingParams, 'xEasingFunction').options(Object.keys(easings))
-    staging.add(easingParams, 'xEasingExponent', .1, 5, .1);
-    staging.add(stagingParams, 'yEasingFunction').options(Object.keys(easings));
-    staging.add(easingParams, 'yEasingExponent', .1, 5, .1);
     staging.add(stagingParams, 'smoothingTimeConstant', 0, 1, .01);
+    staging.add(stagingParams, 'xEasingFunction').options(easings)
+    staging.add(stagingParams, 'xExponent', .1, 10, .1);
+    staging.add(stagingParams, 'yEasingFunction').options(easings);
+    staging.add(stagingParams, 'yExponent', .1, 10, .1);
+
     staging.__controllers.forEach((c) => c.onChange(() => updateAnalysers(['staging'])));
 
 }
 
 const addListeners = () => {
 
-    startButton.addEventListener('click', () => {
-
-        // resume on first user gesture
-        if (aContext.state === 'suspended') {
-            aContext.resume();
+    startButton.addEventListener('click', toggleAudio);
+    window.addEventListener('keydown', (e) => {
+        if (e.keyCode === 13) {
+            toggleAudio();
         }
+    });
 
-        if (audioState === 'stopped') {
-            // can only start a buffer source once / create a new one to start it again
-            try { player.start() }
-            catch (e) {
-                player = aContext.createBufferSource();
-                player.buffer = buffer;
-                player.loop = true;
-                player.connect(aContext.destination);
-                analysers.standard.reconnect(player);
-                analysers.staging.reconnect(player);
-                player.start();
-            }
-            startButton.innerText = 'Stop Audio';
-            audioState = 'started';
+}
+
+const toggleAudio = () => {
+
+    // resume on first user gesture
+    if (aContext.state === 'suspended') {
+        aContext.resume();
+    }
+
+    if (audioState === 'stopped') {
+        // can only start a buffer source once / create a new one to start it again
+        try { player.start() }
+        catch (e) {
+            player = aContext.createBufferSource();
+            player.buffer = buffer;
+            player.loop = true;
+            player.connect(aContext.destination);
+            analysers.standard.reconnect(player);
+            analysers.staging.reconnect(player);
+            player.start();
         }
+        startButton.innerText = 'Stop Audio';
+        audioState = 'started';
+    }
 
-        else if (audioState === 'started') {
-            player.stop();
-            startButton.innerText = 'Start Audio'
-            audioState = 'stopped';
-        }
+    else if (audioState === 'started') {
+        player.stop();
+        startButton.innerText = 'Start Audio'
+        audioState = 'stopped';
+    }
 
-    })
+}
+
+const getEasingFunction = (name, params) => {
+    switch (name) {
+        case 'none': return (n) => n;
+        case 'polyIn': return d3.easePolyIn.exponent(params ? params.exponent : null);
+        case 'polyOut': return d3.easePolyOut.exponent(params ? params.exponent : null);
+        case 'polyInOut': return d3.easePolyInOut.exponent(params ? params.exponent : null);
+        case 'expIn': return d3.easeExpIn;
+        case 'expOut': return d3.easeExpOut;
+        case 'expInOut': return d3.easeExpInOut;
+        default: return (n) => n;
+    }
 }
 
 const addAnalyserToPage = (name, params) => {
@@ -144,38 +179,17 @@ const updateAnalysers = (names) => {
 
         } else if (name === 'staging') {
 
-            const xfnName = stagingParams.xEasingFunction
-            const xfn = easings[xfnName];
-            let xEasing;
-            if (xfnName.includes('poly')) {
-                xEasing = xfn.exponent(easingParams.xEasingExponent);
-            } else {
-                xEasing = xfn;
-            }
-
-            const yfnName = stagingParams.yEasingFunction
-            const yfn = easings[yfnName];
-            let yEasing;
-            if (yfnName.includes('poly')) {
-                yEasing = yfn.exponent(easingParams.yEasingExponent);
-            } else {
-                yEasing = yfn;
-            }
-
-            console.log(xEasing);
             addAnalyserToPage(name, {
                 ...globalParams,
                 ...stagingParams,
-                xEasing,
-                yEasing
+                xEasing: getEasingFunction(stagingParams.xEasingFunction, { exponent: stagingParams.xExponent }),
+                yEasing: getEasingFunction(stagingParams.yEasingFunction, { exponent: stagingParams.yExponent })
             });
 
         }
     });
 
-
-    clear(cContext, 'xAxis');
-    drawXAxis(cContext, analysers.standard, 20);
+    drawOnce();
 
 }
 
@@ -199,6 +213,11 @@ const drawCycle = () => {
 
 const drawOnce = () => {
 
+    clear(cContext, 'analysers');
+    clear(cContext, 'xAxis');
+    clear(cContext, 'yAxis');
+    clear(cContext, 'top');
+
     drawAnalyserBounds(cContext);
 
     drawXAxis(
@@ -207,10 +226,8 @@ const drawOnce = () => {
         20
     );
 
-    // drawEasing(
-    //     cContext
-
-    // )
+    drawEasing(cContext, 0, 0, 'fEasing', analysers.staging.xEasing);
+    drawEasing(cContext, .2, 0, 'aEasing', analysers.staging.yEasing);
 
 }
 
@@ -220,6 +237,7 @@ const render = () => {
 }
 
 init().then(() => {
+    initGui();
     drawOnce();
     render();
 });

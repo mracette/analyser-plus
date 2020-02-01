@@ -1,0 +1,19 @@
+export const morningsAudioFiles = [
+    "ambient-track.mp3",
+    "extra-sweep[4].mp3",
+    "melody-two[8].mp3",
+    "bass-one[8].mp3",
+    "harmony-one[4].mp3",
+    "rhythm-drums[4].mp3",
+    "bass-three[4].mp3",
+    "harmony-three[4].mp3",
+    "rhythm-kick[8].mp3",
+    "bass-two[4].mp3",
+    "harmony-two[4].mp3",
+    "rhythm-reverse[4].mp3",
+    "extra-jammy[8].mp3",
+    "melody-one[8].mp3",
+    "rhythm-tops[8].mp3",
+    "extra-pad[8].mp3",
+    "melody-three[4].mp3"
+]

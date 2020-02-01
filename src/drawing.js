@@ -7,12 +7,6 @@ canvas.width = canvas.clientWidth * window.devicePixelRatio;
 const COORDS = new crco.CanvasCoordinates({ canvas, padding: .01, nxRange: [0, 1], nyRange: [0, 1] });
 
 export const cContext = canvas.getContext('2d');
-const FONT = 'sans-serif';
-cContext.font = `${COORDS.getWidth() / 100}px ${FONT}`;
-cContext.fillStyle = 'black';
-cContext.strokeStyle = 'black';
-cContext.lineWidth = COORDS.getHeight() / 60;
-cContext.lineJoin = "round";
 
 const COLORS = {
     STANDARD: '#CCCCCC',
@@ -21,16 +15,25 @@ const COLORS = {
     BOUNDS: '#000000'
 };
 
+const LINE_WIDTH = {
+    large: COORDS.getHeight() / 60,
+    medium: COORDS.getHeight() / 150,
+    small: COORDS.getHeight() / 500
+};
+
+const FONT = 'sans-serif';
+
 const ANALYSER_PADDING = 0.1;
-// const LABEL_PADDING = 0.05;
 
 const AN_COORDS = new crco.CanvasCoordinates({
+    xOffset: LINE_WIDTH.large,
+    yOffset: LINE_WIDTH.large,
     paddingX: ANALYSER_PADDING,
     paddingY: ANALYSER_PADDING,
     nxRange: [0, 1],
     nyRange: [0, 1],
-    baseHeight: COORDS.getHeight(),
-    baseWidth: COORDS.getWidth()
+    baseHeight: COORDS.getHeight() - 2 * LINE_WIDTH.large,
+    baseWidth: COORDS.getWidth() - 2 * LINE_WIDTH.large
 });
 
 const XAXIS_COORDS = new crco.CanvasCoordinates({
@@ -40,7 +43,30 @@ const XAXIS_COORDS = new crco.CanvasCoordinates({
     nyRange: [0, 1],
     baseWidth: AN_COORDS.getWidth(),
     baseHeight: COORDS.getHeight() * ANALYSER_PADDING / 2
-})
+});
+
+const YAXIS_COORDS = new crco.CanvasCoordinates({
+    xOffset: 0,
+    yOffset: 0,
+    nxRange: [0, 1],
+    nyRange: [0, 1],
+    baseWidth: COORDS.getWidth() * ANALYSER_PADDING / 2,
+    baseHeight: AN_COORDS.getHeight()
+});
+
+const TOP_COORDS = new crco.CanvasCoordinates({
+    xOffset: AN_COORDS.nx(0),
+    yOffset: COORDS.ny(0),
+    nxRange: [0, 1],
+    nyRange: [0, 1],
+    baseWidth: AN_COORDS.getWidth(),
+    baseHeight: COORDS.getHeight() * ANALYSER_PADDING
+});
+
+cContext.font = `${COORDS.getWidth() / 100}px ${FONT}`;
+cContext.fillStyle = 'black';
+cContext.strokeStyle = 'black';
+cContext.lineJoin = "round";
 
 const kFormatter = (num) => {
     return Math.abs(num) > 999 ? Math.sign(num) * ((Math.abs(num) / 1000).toFixed(1)) + 'k' : Math.sign(num) * Math.abs(num)
@@ -58,18 +84,34 @@ export const clear = (ctx, section) => {
             break;
         case 'xAxis':
             ctx.clearRect(
-                COORDS.nx(0),
-                COORDS.ny(1 - LABEL_PADDING) - ctx.lineWidth,
-                COORDS.getWidth(),
-                COORDS.getHeight() * (LABEL_PADDING) + ctx.lineWidth
+                XAXIS_COORDS.nx(0),
+                XAXIS_COORDS.ny(0),
+                XAXIS_COORDS.getWidth(),
+                XAXIS_COORDS.getHeight()
             );
             break;
         case 'yAxis':
+            ctx.clearRect(
+                YAXIS_COORDS.nx(0),
+                YAXIS_COORDS.ny(0),
+                YAXIS_COORDS.getWidth(),
+                YAXIS_COORDS.getHeight()
+            );
+            break;
+        case 'top':
+            ctx.clearRect(
+                TOP_COORDS.nx(0),
+                TOP_COORDS.ny(0),
+                TOP_COORDS.getWidth(),
+                TOP_COORDS.getHeight()
+            );
+            break;
     }
 }
 
 export const drawFreqLines = (ctx, analyser) => {
 
+    ctx.lineWidth = LINE_WIDTH.medium;
     ctx.globalCompositeOperation = 'destination-over';
 
     const bMin = analyser.minFrequency;
@@ -118,17 +160,26 @@ export const drawFreqLines = (ctx, analyser) => {
 
 export const drawFreqBuckets = (ctx, analyser) => {
 
+    ctx.lineWidth = LINE_WIDTH.medium;
+    ctx.globalCompositeOperation = 'destination-over';
+
+    if (analyser.id === 'standard') {
+        ctx.strokeStyle = COLORS.STANDARD;
+    } else if (analyser.id === 'staging') {
+        ctx.strokeStyle = COLORS.STAGING;
+    }
+
     const n = analyser.numBuckets;
     const bucketData = analyser.getFrequencyBuckets();
-    const bucketWidth = COORDS.getWidth() * (1 - 2 * LABEL_PADDING) / n;
+    const bucketWidth = AN_COORDS.getWidth() / n;
 
     ctx.beginPath();
 
     bucketData.forEach((d, i) => {
 
-        const x = COORDS.nx(LABEL_PADDING + ANALYSER_PADDING + (1 - 2 * (LABEL_PADDING + ANALYSER_PADDING)) * (i / n));
+        const x = AN_COORDS.nx(i / n);
         const x1 = x + bucketWidth;
-        const y = COORDS.ny((1 - LABEL_PADDING - ANALYSER_PADDING) - (1 - LABEL_PADDING - ANALYSER_PADDING) * d / 255);
+        const y = AN_COORDS.ny(1 - d / 255);
 
         ctx.moveTo(x, y);
         ctx.lineTo(x1, y);
@@ -137,16 +188,17 @@ export const drawFreqBuckets = (ctx, analyser) => {
 
     ctx.stroke();
 
+    ctx.globalCompositeOperation = 'source-over';
+
 }
 
 export const drawXAxis = (ctx, analyser, max) => {
 
-    ctx.font = `${XAXIS_COORDS.getHeight() / 2.5}px ${FONT}`;
-
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.strokeStyle = 'black'
-    ctx.lineWidth = XAXIS_COORDS.getWidth() / 500;
+    ctx.strokeStyle = COLORS.BLACK;
+    ctx.lineWidth = LINE_WIDTH.small;
+    ctx.font = `${XAXIS_COORDS.getHeight() / 2.5}px ${FONT}`;
 
     // cap the number of labels
     const n = Math.min(max, analyser.frequencyBinCount);
@@ -189,6 +241,7 @@ export const drawXAxis = (ctx, analyser, max) => {
 
 export const drawAnalyserBounds = (ctx) => {
 
+    ctx.lineWidth = LINE_WIDTH.large;
     ctx.strokeStyle = COLORS.BOUNDS;
 
     ctx.strokeRect(
@@ -200,20 +253,31 @@ export const drawAnalyserBounds = (ctx) => {
 
 }
 
-export const drawEasing = (ctx, x, y, w, h, fn) => {
+export const drawEasing = (ctx, x0, y0, text, fn) => {
 
-    ctx.strokeRect(COORDS.nx(x), COORDS.ny(y), w, h);
+    ctx.lineWidth = LINE_WIDTH.small;
+    ctx.textBaseline = 'middle';
+    ctx.strokeStyle = COLORS.BLACK;
+
+    const h = TOP_COORDS.getHeight();
+    const w = h;
+
+    ctx.strokeRect(TOP_COORDS.nx(x0) + w, TOP_COORDS.ny(y0), w, h);
+    ctx.fillText(text, TOP_COORDS.nx(x0) + w / 2, TOP_COORDS.ny(0.5));
 
     const res = 63;
+    ctx.beginPath();
 
     for (let i = 0; i <= res; i++) {
-        const x = COORDS.nx(x) + w * i / res;
-        const y = COORDS.ny(y) - h * fn(i / res);
+        const x = w + TOP_COORDS.nx(x0) + w * i / res;
+        const y = TOP_COORDS.ny(y0) + h - h * fn(i / res);
         if (i === 0) {
             ctx.moveTo(x, y);
         } else {
             ctx.lineTo(x, y);
         }
     }
+
+    ctx.stroke();
 
 }
