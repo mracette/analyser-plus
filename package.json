@@ -1,0 +1,26 @@
+{
+  "name": "live-rollup",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "watch": "rollup -c -w -m;"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/core": "^7.8.3",
+    "@babel/plugin-transform-modules-commonjs": "^7.8.3",
+    "@babel/preset-env": "^7.8.3",
+    "rollup": "^1.30.1",
+    "rollup-plugin-babel": "^4.3.3",
+    "rollup-plugin-node-resolve": "^5.2.0",
+    "rollup-plugin-terser": "^5.2.0"
+  },
+  "dependencies": {
+    "crco-utils": "0.0.4",
+    "d3-ease": "^1.0.6",
+    "dat.gui": "^0.7.6"
+  }
+}

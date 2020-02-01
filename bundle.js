@@ -1,0 +1,1 @@
+console.error("\n/Users/markracette/Drive/Dev/projects/analyser-plus/src/index.js:2\nimport { Analyser } from './analyser';\n^\nParseError: 'import' and 'export' may appear only with 'sourceType: module'");
